@@ -1,4 +1,4 @@
-# Copyright 2022 The Flax Authors.
+# Copyright 2023 The Flax Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -238,7 +238,8 @@ class Partitioned(struct.PyTreeNode, AxisMetadata):
     if apply_constraint and (_global_mesh_defined() or self.mesh is not None):
       axis_resource = self.get_partition_spec()
       if self.mesh is not None:
-        axis_resource = jax.sharding.NamedSharding(self.mesh, axis_resource)
+        sharding = jax.sharding.NamedSharding(self.mesh, axis_resource)
+        return jax.lax.with_sharding_constraint(self.value, sharding)
       return jax.lax.with_sharding_constraint(
           self.value, axis_resource)
     else:

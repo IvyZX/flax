@@ -1,4 +1,4 @@
-# Copyright 2022 The Flax Authors.
+# Copyright 2023 The Flax Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -245,7 +245,8 @@ def copy(x: Union[FrozenDict, Dict[str, Any]], add_or_replace: Union[FrozenDict,
 
 def pop(x: Union[FrozenDict, Dict[str, Any]], key: str) -> Tuple[Union[FrozenDict, Dict[str, Any]], Any]:
   """Create a new dict where one entry is removed. This is a utility
-  function for regular dicts that mimics the behavior of `FrozenDict.pop`.
+  function that can act on either a FrozenDict or regular dict and
+  mimics the behavior of `FrozenDict.pop`.
 
   Example::
 

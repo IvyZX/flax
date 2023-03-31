@@ -1,4 +1,4 @@
-# Copyright 2022 The Flax Authors.
+# Copyright 2023 The Flax Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ all_requires = [
 tests_require = [
   "atari-py==0.2.5",  # Last version does not have the ROMs we test on pre-packaged
   "clu",  # All examples.
+  "einops",
   "gym==0.18.3",
   "jaxlib",
   "jraph>=0.0.6dev0",
