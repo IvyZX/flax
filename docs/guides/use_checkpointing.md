@@ -13,35 +13,33 @@ jupyter:
 <!-- #region id="6e9134fa" -->
 # Save and load checkpoints
 
-In this guide, you will learn about saving and loading your Flax checkpoints with [Orbax](https://github.com/google/orbax).
+This guide demonstrates how to save and load Flax checkpoints with [Orbax](https://github.com/google/orbax).
 
-Orbax provides a variety of features related to saving and loading model data, which this guide will showcase:
+Orbax provides a variety of features for saving and loading model data, which you will learn about in this doc:
 
-*  Support to various array types and storage formats;
-*  Asynchronous saving to reduce training wait time;
-*  Versioning and automatic bookkeeping of past checkpoints;
-*  Flexible [`transformations`](https://github.com/google/orbax/blob/main/docs/checkpoint.md#transformations) to tweak and load old checkpoints;
-*  [`jax.sharding`](https://jax.readthedocs.io/en/latest/notebooks/Distributed_arrays_and_automatic_parallelization.html)-based API to save and load in multi-host scenarios.
-
-For backward-compatibility purposes, this guide will also show the equivalent calls in Flax legacy checkpointing APIs `flax.training.checkpoints`.
-
-See [Orbax Checkpoint Documentation](https://github.com/google/orbax/blob/main/docs/checkpoint.md) for more details.
+*  Support for various array types and storage formats
+*  Asynchronous saving to reduce training wait time
+*  Versioning and automatic bookkeeping of past checkpoints
+*  Flexible [`transformations`](https://github.com/google/orbax/blob/main/docs/checkpoint.md#transformations) to tweak and load old checkpoints
+*  [`jax.sharding`](https://jax.readthedocs.io/en/latest/notebooks/Distributed_arrays_and_automatic_parallelization.html)-based API to save and load in multi-host scenarios
 
 ---
-**_Ongoing Migration:_** 
+**_Ongoing migration to Orbax:_** 
 
-After July 30 2023, Flax's legacy checkpointing APIs `flax.training.checkpoints` will enter maintainence mode in favor of [Orbax](https://github.com/google/orbax).
+After July 30 2023, Flax's legacy `flax.training.checkpoints` API will enter maintenance mode in favor of [Orbax](https://github.com/google/orbax).
 
-*  **If you are a new Flax user**: Please start with the new `orbax.checkpoint` API, as demonstrated in this guide. 
+*  **If you are a new Flax user**: Use the new `orbax.checkpoint` API, as demonstrated in this guide.
 
-*  **If you have used legacy Flax APIs `flax.training.checkpoints`**: You have two options to consider:
+*  **If you have legacy `flax.training.checkpoints` code in your project**: Consider the following options:
 
-   * **Recommended**: Migrate your API calls to `orbax.checkpoint` API following this simple [migration guide](https://flax.readthedocs.io/en/latest/guides/orbax_upgrade_guide.html).
+   * **Migrating (Recommended)**: Migrate your API calls to `orbax.checkpoint` API by following this [migration guide](https://flax.readthedocs.io/en/latest/guides/orbax_upgrade_guide.html).
 
-   * **Transitory**: Try adding `flax.config.update('flax_use_orbax_checkpointing', True)` to your project, which will let your `flax.training.checkpoints` calls automatically use the Orbax backend to save your checkpoints. 
-   
-      * **Special conditions may apply - check out the [Orbax-as-backend troubleshoot section](#orbax-as-backend-troubleshoot) for any issues.** 
+   * **Transitioning to Orbax**: Try adding `flax.config.update('flax_use_orbax_checkpointing', True)` to your project, which will let your `flax.training.checkpoints` calls automatically use the Orbax backend to save your checkpoints. **Note:** Special conditions may apply —— check the [Orbax-as-backend troubleshooting section](#orbax-as-backend-troubleshoot) for any issues.** 
 ---
+
+For backward-compatibility, this guide shows the Orbax-equivalent calls in the Flax legacy `flax.training.checkpoints` API.
+
+If you need to learn more about `orbax.checkpoint`, refer to the [Orbax docs](https://github.com/google/orbax/blob/main/docs/checkpoint.md).
 
 <!-- #endregion -->
 
@@ -52,12 +50,12 @@ Install/upgrade Flax and [Orbax](https://github.com/google/orbax). For JAX insta
 <!-- #endregion -->
 
 ```python tags=["skip-execution"]
-# replace with `pip install flax` after release 0.6.9.
+# replace with `pip install -U flax` after release 0.6.9.
 ! pip install -U -qq "git+https://github.com/google/flax.git@main#egg=flax"
 ```
 
 <!-- #region id="-icO30rwmKYj" -->
-Note: Before running `import jax`, create eight fake devices to mimic [multi-host environment](https://jax.readthedocs.io/en/latest/jax-101/06-parallelism.html?#aside-hosts-and-devices-in-jax) this notebook. Note that the order of imports is important here. The `os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8'` command works only with the CPU backend. This means it won't work with GPU/TPU acceleration on if you're running this notebook in Google Colab. If you are already running the code on multiple devices (for example, in a 4x2 TPU environment), you can skip running the next cell.
+Note: Before running `import jax`, create eight fake devices to mimic a [multi-host environment](https://jax.readthedocs.io/en/latest/jax-101/06-parallelism.html?#aside-hosts-and-devices-in-jax) in this notebook. Note that the order of imports is important here. The `os.environ["XLA_FLAGS"] = '--xla_force_host_platform_device_count=8'` command works only with the CPU backend, which means it won't work with GPU/TPU acceleration on if you're running this notebook in Google Colab. If you are already running the code on multiple devices (for example, in a 4x2 TPU environment), you can skip running the next cell.
 <!-- #endregion -->
 
 ```python id="ArKLnsyGRxGv"
@@ -94,7 +92,9 @@ if os.path.exists(ckpt_dir):
 
 In Orbax and Flax, you can save and load any given JAX [pytree](https://jax.readthedocs.io/en/latest/pytrees.html). This includes not only typical Python and NumPy containers, but also customized classes extended from [`flax.struct.dataclass`](https://flax.readthedocs.io/en/latest/api_reference/flax.struct.html#flax.struct.dataclass). That means you can store almost any data generated — not only your model parameters, but any arrays/dictionaries, metadata/configs, and so on.
 
-Create a pytree with many data structures and containers, and play with it:
+### With Orbax
+
+1.  Create a pytree with many data structures and containers, and play with it:
 <!-- #endregion -->
 
 ```python id="56dec3f6" outputId="f1856d96-1961-48ed-bb7c-cb63fbaa7567"
@@ -123,9 +123,9 @@ ckpt
 ```
 
 <!-- #region id="6fc59dfa" -->
-Now save the checkpoint with an Orbax `PyTreeCheckpointer`, directly to `tmp/orbax/single_save` directory.
+2. Save the checkpoint with `orbax.checkpoint.PyTreeCheckpointer`, directly to the `tmp/orbax/single_save` directory.
 
-Note that an optional `save_args` is provided. This is recommended for performance speedups, as it bundles smaller arrays in your pytree to a single large file instead of multiple smaller files.
+Note: An optional `save_args` is provided. This is recommended for performance speedups, as it bundles smaller arrays in your pytree to a single large file instead of multiple smaller files.
 <!-- #endregion -->
 
 ```python id="0pp4QtEqW9k7"
@@ -136,11 +136,11 @@ save_args = orbax_utils.save_args_from_target(ckpt)
 orbax_checkpointer.save('tmp/orbax/single_save', ckpt, save_args=save_args)
 ```
 
-To use versioning and automatic bookkeeping features, you need to wrap an Orbax `CheckpointManager` over the `PyTreeCheckpointer`. 
+3. To use versioning and automatic bookkeeping features, you need to wrap `orbax.checkpoint.CheckpointManager` over `orbax.checkpoint.PyTreeCheckpointer`. 
 
-Also provide an `CheckpointManagerOptions` that customizes your needs, such as how often and on what criteria you prefer old checkpoints be deleted. See [documentation](https://github.com/google/orbax/blob/main/docs/checkpoint.md#checkpointmanager) for a full list of options offered.
+In addition, provide `orbax.checkpoint.CheckpointManagerOptions` that customizes your needs, such as how often and on what criteria you prefer old checkpoints be deleted. See [documentation](https://github.com/google/orbax/blob/main/docs/checkpoint.md#checkpointmanager) for a full list of options offered.
 
-`CheckpointManager` should be placed at top-level outside your training steps, to overall manage your saves.
+`orbax.checkpoint.CheckpointManager` should be placed at the top-level outside your training steps to manage your saves.
 
 ```python id="T6T8V4UBXB1R" outputId="b7132933-566d-440d-c34e-c5468d87cbdc"
 options = orbax.checkpoint.CheckpointManagerOptions(max_to_keep=2, create=True)
@@ -149,14 +149,16 @@ checkpoint_manager = orbax.checkpoint.CheckpointManager(
 
 # Inside a training loop
 for step in range(5):
-    # ... do your training ...
+    # ... do your training
     checkpoint_manager.save(step, ckpt, save_kwargs={'save_args': save_args})
 
-os.listdir('tmp/orbax/managed')  # since max_to_keep=2, only step 3 and 4 are retained
+os.listdir('tmp/orbax/managed')  # Because max_to_keep=2, only step 3 and 4 are retained
 ```
 
 <!-- #region id="OQkUOkHVW_4e" -->
-Alternatively you could save with the legacy Flax checkpointing utilities. Note that this provides less management features than Orbax's `CheckpointManagerOptions`.
+### With the legacy API
+
+And here's how to save with legacy Flax checkpointing utilities (note that this provides less management features compared with `orbax.checkpoint.CheckpointManagerOptions`):
 <!-- #endregion -->
 
 ```python id="4cdb35ef" outputId="6d849273-15ce-4480-8864-726d1838ac1f"
@@ -173,7 +175,9 @@ checkpoints.save_checkpoint(ckpt_dir='tmp/flax-checkpointing',
 <!-- #region id="6b658bd1" -->
 ## Restore checkpoints
 
-In Orbax, call `.restore()` for either `PyTreeCheckpointer` or `CheckpointManager` will restore your checkpoint, in the raw pytree format.
+### With Orbax
+
+In Orbax, call `.restore()` for either `orbax.checkpoint.PyTreeCheckpointer.PyTreeCheckpointer` or `orbax.checkpoint.CheckpointManager` to restore your checkpoint in the raw pytree format.
 <!-- #endregion -->
 
 ```python id="WgRJj3wjXIaN" outputId="b4af1ef4-f22f-459b-bdca-2e6bfa16c08b"
@@ -181,7 +185,7 @@ raw_restored = orbax_checkpointer.restore('tmp/orbax/single_save')
 raw_restored
 ```
 
-Note that the `step` number is required for `CheckpointManger`. You could also use `.latest_step()` to find the latest step available.
+Note that the `step` number is required for `CheckpointManger`. You can also use `.latest_step()` to find the latest step available.
 
 ```python
 step = checkpoint_manager.latest_step()  # step = 4
@@ -189,9 +193,11 @@ checkpoint_manager.restore(step)
 ```
 
 <!-- #region id="VKJrfSyLXGrc" -->
-Alternatively you could load the checkpoint with the legacy Flax checkpointing utilities.
+### With the legacy API
 
-Note that With the migration to Orbax in progress, `restore_checkpoint` can automatically identify whether a checkpoint is saved in the legacy Flax format or with an Orbax backend, and restore the pytree correctly. Therefore, adding `flax.config.update('flax_use_orbax_checkpointing', True)` won't hurt your ability to restore old checkpoints.
+Note that with the migration to Orbax in progress, `flax.training.checkpointing.restore_checkpoint` can automatically identify whether a checkpoint is saved in the legacy Flax format or with an Orbax backend, and restore the pytree correctly. Therefore, adding `flax.config.update('flax_use_orbax_checkpointing', True)` won't hurt your ability to restore old checkpoints.
+
+Here's how to restore checkpoints using the legacy API: 
 <!-- #endregion -->
 
 ```python id="150b20a0" outputId="85ffceca-f38d-46b8-e567-d9d38b7885f9"
@@ -202,11 +208,15 @@ raw_restored
 <!-- #region id="987b981f" -->
 ## Restore with custom dataclasses
 
-Note that all the pytrees restored above are raw dictionaries, whereas the original pytrees contain custom dataclasses like `TrainState` and `optax` states. That is because when restoring the pytree, the program does not yet know which structure it once belongs to.
+### With Orbax
 
-To resolve this, you should provide an example pytree to let the Orbax or Flax know exactly what structure it should restore to. This example should introduce any custom Flax dataclasses explicitly, and have the same structure as the saved checkpoint.
+*  The pytrees restored in the previous examples are in the form of raw dictionaries. *  Original pytrees contain custom dataclasses like [`TrainState`](https://flax.readthedocs.io/en/latest/flip/1009-optimizer-api.html?#train-state) and `optax` states.
+*  This is because when restoring a pytree, the program does not yet know which structure it once belonged to.
+*  To resolve this, you should first provide an example pytree to let Orbax or Flax know exactly which structure to restore to.
 
-> Side note: Data that was a JAX NumPy array (`jnp.array`) will be restored as a NumPy array (`numpy.array`). This would not affect your work because JAX will [automatically convert](https://jax.readthedocs.io/en/latest/jax-101/01-jax-basics.html) NumPy arrays to JAX arrays once the computation starts.
+This section demonstrates how to set up any custom Flax dataclass explicitly, and have the same structure as a saved checkpoint.
+
+Note: Data that was a JAX NumPy array (`jnp.array`) format will be restored as a NumPy array (`numpy.array`). This would not affect your work because JAX will [automatically convert](https://jax.readthedocs.io/en/latest/jax-101/01-jax-basics.html) NumPy arrays to JAX arrays once the computation starts.
 <!-- #endregion -->
 
 ```python id="58f42513" outputId="110c6b6e-fe42-4179-e5d8-6b92d355e11b"
@@ -221,7 +231,9 @@ state_restored = orbax_checkpointer.restore('tmp/orbax/single_save', item=target
 state_restored
 ```
 
-Alternatively, restore from Orbax `CheckpointManager` and from legacy Flax code:
+### With the legacy API
+
+Alternatively, you can restore from Orbax `CheckpointManager` and from the legacy Flax code as follows:
 
 ```python
 checkpoint_manager.restore(4, items=target)
@@ -231,16 +243,18 @@ checkpoint_manager.restore(4, items=target)
 checkpoints.restore_checkpoint(ckpt_dir='tmp/flax-checkpointing', target=target)
 ```
 
-It's often recommended to refactor out the process of initializing a checkpoint's structure (for example, a [`TrainState`](https://flax.readthedocs.io/en/latest/flip/1009-optimizer-api.html?#train-state)), so that saving/loading is easier and less error-prone. This is because functions and complex objects like `apply_fn` and `tx` (optimizer) cannot be serialized into the checkpoint file and must be initiated by code.
+It's often recommended to refactor out the process of initializing a checkpoint's structure (for example, a [`TrainState`](https://flax.readthedocs.io/en/latest/flip/1009-optimizer-api.html?#train-state)), so that saving/loading is easier and less error-prone. This is because functions and complex objects like `apply_fn` and `tx` (optimizer) cannot be serialized into the checkpoint file and must be initialized by code.
 
 <!-- #region id="136a300a" -->
 ### Restore when checkpoint structures differ
 
-During your development, at times you change your model, or you add and remove fields to tweak it better for your needs. That means your checkpoint structure will change! How can your old data be loaded to your new code?
+During your development, your checkpoint structure will change when changing the model, adding/removing fields during tweaking, and so on.
 
-Below showcases a simple example - a `TrainStatePlus` extended from `TrainState` that contains an extra field `batch_stats`. In real practice, you may need this when doing [batch normalization](https://flax.readthedocs.io/en/latest/guides/batch_norm.html).
+This section explains how to load old data to your new code.
 
-Let's store the new `TrainStatePlus` as step 5. Remember that step 4 has the old `TrainState`.
+Below is  a simple example — a `TrainStatePlus` extended from `flax.training.train_state.TrainState` that contains an extra field called `batch_stats`. When working on a real-world model, you may need this when applying [batch normalization](https://flax.readthedocs.io/en/latest/guides/batch_norm.html).
+
+Here, you store the new `TrainStatePlus` as step 5, while step 4 contains the old/previous `TrainState`.
 <!-- #endregion -->
 
 ```python id="be65d4af" outputId="4fe776f0-65f8-4fc4-d64a-990520b36dce"
@@ -258,21 +272,20 @@ custom_ckpt = {'model': custom_state, 'config': config, 'data': [x1]}
 # Use a custom state to read the old `TrainState` checkpoint.
 custom_target = {'model': custom_state, 'config': None, 'data': [jnp.zeros_like(x1)]}
 
-
 # Save it in Orbax.
 custom_save_args = orbax_utils.save_args_from_target(custom_ckpt)
 checkpoint_manager.save(5, custom_ckpt, save_kwargs={'save_args': custom_save_args})
 ```
 
 <!-- #region id="379c2255" -->
-It is recommended to keep your checkpoints up to date with your pytree dataclass definitions, but things happens and you might be forced to restore checkpoints with incompatible reference objects at runtime. 
+It is recommended to keep your checkpoints up-to-date with your pytree dataclass definitions. However, you might be forced to restore the checkpoints with incompatible reference objects at runtime. When this happens, the checkpoint restoration will try to respect the structure of the reference when given.
 
-When this happens, the checkpoint restoration will try to respect the structure of the reference when given. Below showcases a few common scenarios.
+Below are examples of a few common scenarios.
 <!-- #endregion -->
 
-#### When reference object is partial
+#### Scenario 1: When a reference object is partial
 
-If your reference object is a subtree of your checkpoint, the restoration will ignore the additional field(s) and restore a checkpoint with same structure as the reference. 
+If your reference object is a subtree of your checkpoint, the restoration will ignore the additional field(s) and restore a checkpoint with the same structure as the reference. 
 
 Like in the example below, the `batch_stats` field in `CustomTrainState` was ignored, and the checkpoint was restored as a `TrainState`.
 
@@ -285,13 +298,13 @@ assert type(restored['model']) == train_state.TrainState
 restored
 ```
 
-#### When checkpoint is partial
+#### Scenario 2: When a checkpoint is partial
 
 On the other hand, if the reference object contains a value that is not available in the checkpoint, the checkpointing code will by default warn that some data is not compatible.
 
-To bypass the error, you need to pass an Orbax [`transform`](https://github.com/google/orbax/blob/main/docs/checkpoint.md#transformations) that teaches Orbax how to conform this checkpoint into the structure of `custom_target`.
+To bypass the error, you need to pass an Orbax [`transform`](https://github.com/google/orbax/blob/main/docs/checkpoint.md#transformations) that teaches Orbax how to conform this checkpoint into the structure of the `custom_target`.
 
-In this case, we pass a default `{}` that lets Orbax use values in `custom_target` to fill in the blank. This lets us restore an old checkpoint into a new data structure, the `CustomTrainState`.
+In this case, pass a default `{}` that lets Orbax use values in the `custom_target` to fill in the blank. This allows you to restore an old checkpoint into a new data structure, the `CustomTrainState`.
 
 ```python
 try:
@@ -300,7 +313,7 @@ except KeyError as e:
     print(f'KeyError when target state has an unmentioned field: {e}')
     print('')
 
-# Step 4 is an original TrainState, without "batch_stats"
+# Step 4 is an original `TrainState`, without the `batch_stats`
 restored = checkpoint_manager.restore(4, items=custom_target, 
                                       restore_kwargs={'transforms': {}})
 assert type(restored['model']) == CustomTrainState
@@ -309,10 +322,12 @@ np.testing.assert_equal(restored['model'].batch_stats,
 restored
 ```
 
-If you already saved your checkpoints with an Orbax backend, you can use `orbax_transforms` to access this `transforms` arg in the Flax API.
+##### With Orbax
+
+If you have already saved your checkpoints with the Orbax backend, you can use `orbax_transforms` to access this `transforms` argument in the Flax API.
 
 ```python id="29fd1e33" outputId="cdbb9247-d1eb-4458-aa83-8db0332af7cb"
-# Save in Flax-with-Orbax-backend.
+# Save in the "Flax-with-Orbax" backend.
 flax.config.update('flax_use_orbax_checkpointing', True)
 checkpoints.save_checkpoint(ckpt_dir='tmp/flax-checkpointing',
                             target=ckpt,
@@ -324,10 +339,14 @@ checkpoints.restore_checkpoint('tmp/flax-checkpointing', target=custom_target, s
                                orbax_transforms={})
 ```
 
-In legacy Flax checkpoint APIs, similar things are doable too, but not as flexible as [Orbax Transformations](https://github.com/google/orbax/blob/main/docs/checkpoint.md#transformations). You need to first restore the checkpoint to a raw dict with `target=None`, modify the structure accordingly, and then deserialize it back to original target.
+##### With the legacy API
+
+Using the legacy `flax.training.checkpoints` API, similar things are doable too, but they are not as flexible as the [Orbax Transformations](https://github.com/google/orbax/blob/main/docs/checkpoint.md#transformations).
+
+You need to restore the checkpoint to a raw dict with `target=None`, modify the structure accordingly, and then deserialize it back to the original target.
 
 ```python
-# Save in legacy Flax.
+# Save using the legacy Flax `checkpoints` API.
 flax.config.update('flax_use_orbax_checkpointing', False)
 checkpoints.save_checkpoint(ckpt_dir='tmp/flax-checkpointing',
                             target=ckpt,
@@ -358,7 +377,7 @@ Whenever you want to explicitly wait until an async save is done, you can call `
 ```python id="85be68a6" outputId="aefce94c-8bae-4355-c142-05f2b61c39e2"
 # `orbax.checkpoint.AsyncCheckpointer` needs some multi-process initialization, because it was
 # originally designed for multi-process large model checkpointing.
-# For Python notebooks or other single-process setting, just set up with `num_processes=1`.
+# For Python notebooks or other single-process settings, just set up with `num_processes=1`.
 # Refer to https://jax.readthedocs.io/en/latest/multi_process.html#initializing-the-cluster
 # for how to set it up in multi-process scenarios.
 jax.distributed.initialize("localhost:8889", num_processes=1, process_id=0)
@@ -390,9 +409,9 @@ async_checkpoint_manager.wait_until_finished()
 
 JAX provides a few ways to scale up your code on multiple hosts at the same time. This usually happens when the number of devices (CPU/GPU/TPU) is so large that different devices are managed by different hosts (CPU). To get started on JAX in multi-process settings, check out [Using JAX in multi-host and multi-process environments](https://jax.readthedocs.io/en/latest/multi_process.html) and the [distributed array guide](https://jax.readthedocs.io/en/latest/notebooks/Distributed_arrays_and_automatic_parallelization.html).
 
-In the [Single Program Multi Data (SPMD)](https://jax.readthedocs.io/en/latest/glossary.html#term-SPMD) paradigm with JAX [`pjit`](https://jax.readthedocs.io/en/latest/jax.experimental.pjit.html), a large multi-process array can have its data sharded across different devices (check out the `pjit` [JAX-101 tutorial](https://jax.readthedocs.io/en/latest/jax-101/08-pjit.html)). When a multi-process array is serialized, each host dumps its data shards to a single shared storage, such as a Google Cloud bucket.
+In the [Single Program Multi Data (SPMD)](https://jax.readthedocs.io/en/latest/glossary.html#term-SPMD) paradigm with JAX [`pjit`](https://jax.readthedocs.io/en/latest/jax.experimental.pjit.html), a large multi-process array can have its data sharded across different devices. (Note that JAX `pjit` and `jit` have been merged into a single unified interface. To learn about compiling and executing JAX functions in multi-host or multi-core environments, refer to [this guide](https://jax.readthedocs.io/en/latest/notebooks/Distributed_arrays_and_automatic_parallelization.html) and the [jax.Array migration guide](https://jax.readthedocs.io/en/latest/jax_array_migration.html).) When a multi-process array is serialized, each host dumps its data shards to a single shared storage, such as a Google Cloud bucket.
 
-Orbax supports saving and loading pytrees with multi-process arrays in the same fashion as single-process pytrees. However, it's recommended to use the asynchronized [`orbax.AsyncCheckpointer`](https://github.com/google/orbax/blob/main/orbax/checkpoint/async_checkpointer.py) to save large multi-process arrays on another thread, so that you can perform computation alongside the saves. With pure Orbax, saving checkpoints in a multiprocess context uses the same API as in a single process context.
+Orbax supports saving and loading pytrees with multi-process arrays in the same fashion as single-process pytrees. However, it's recommended to use the asynchronized [`orbax.AsyncCheckpointer`](https://github.com/google/orbax/blob/main/orbax/checkpoint/async_checkpointer.py) to save large multi-process arrays on another thread, so that you can perform computation alongside the saves. With pure Orbax, saving checkpoints in a multi-process context uses the same API as in a single-process context.
 <!-- #endregion -->
 
 ```python id="ubdUvyMrhD-1"
@@ -406,7 +425,7 @@ mesh = jax.sharding.Mesh(devices, ('x', 'y'))
 mp_array = jax.device_put(np.arange(8 * 2).reshape(8, 2),
                           NamedSharding(mesh, PartitionSpec('x', 'y')))
 
-# Make it a pytree, just because we can.
+# Make it a pytree.
 mp_ckpt = {'model': mp_array}
 ```
 
@@ -418,6 +437,8 @@ async_checkpoint_manager.wait_until_finished()
 When restoring a checkpoint with multi-process arrays, you need to specify what `sharding` each array should be restored back to. Otherwise, they will be restored as large `np.array`s on process 0, costing time and memory.
 
 (In this notebook, since we are on single-process, it will be restored as `np.array` even if we provide shardings.)
+
+### With Orbax
 
 Orbax allows you to specify this by passing a pytree of `sharding`s in `restore_args`. If you already have a reference pytree that has all the arrays with the right sharding, you can use `orbax_utils.restore_args_from_target` to transform it into the `restore_args` that Orbax needs.
 
@@ -434,7 +455,7 @@ async_checkpoint_manager.restore(
 ```
 
 <!-- #region id="edc355ce" -->
-### Legacy Flax: use `save_checkpoint_multiprocess`
+### With the legacy Flax: use `save_checkpoint_multiprocess`
 
 In legacy Flax, to save multi-process arrays, use [`flax.training.checkpoints.save_checkpoint_multiprocess()`](https://flax.readthedocs.io/en/latest/api_reference/flax.training.html#flax.training.checkpoints.save_checkpoint_multiprocess) in place of `save_checkpoint()` and with the same arguments.
 
@@ -459,27 +480,27 @@ mp_restored = checkpoints.restore_checkpoint(ckpt_dir,
 mp_restored
 ```
 
-## Orbax-As-Backend Troubleshoot
+## Orbax-as-backend troubleshooting
 
-As an intermediate stage of the migration, `flax.training.checkpoints` APIs will start to use Orbax as their backend when saving checkpoints starting from May 15, 2023.
+As an intermediate stage of the migration (to Orbax from the legacy Flax `checkpoints` API), `flax.training.checkpoints` APIs will start to use Orbax as their backend when saving checkpoints starting from May 15, 2023.
 
-Checkpoints saved with Orbax backend can be readable by either `flax.training.checkpoints.restore_checkpoint` or a `orbax.checkpoint.PyTreeCheckpointer`.
+Checkpoints saved with the Orbax backend can be readable by either `flax.training.checkpoints.restore_checkpoint` or `orbax.checkpoint.PyTreeCheckpointer`.
 
-Code-wise, this is equivalent to setting the config flag [`flax.config.flax_use_orbax_checkpointing`](https://github.com/google/flax/blob/main/flax/configurations.py#L103) default to `True`. You could overwrite this value in your project with `flax.config.update('flax_use_orbax_checkpointing', <BoolValue>)` at any time.
+Code-wise, this is equivalent to setting the config flag [`flax.config.flax_use_orbax_checkpointing`](https://github.com/google/flax/blob/main/flax/configurations.py#L103) default to `True`. You can overwrite this value in your project with `flax.config.update('flax_use_orbax_checkpointing', <BoolValue>)` at any time.
 
 In general, this automatic migration will not affect most users. However, you may encounter issues if your API usage follows some specific pattern. Check out the sections below for troubleshooting.
 
 
-### If your devices hangs when writing checkpoints
+### If your devices hang when writing checkpoints
 
-If you are running in multi-host environment (usually anything larger than 8 TPU devices) and your devices hang when writing checkpoints, please check out if your code is in the following pattern (aka. `save_checkpoint` only ran on host 0):
+If you are running in a multi-host environment (usually anything larger than 8 TPU devices) and your devices hang when writing checkpoints, check if your code is in the following pattern (that is, the `save_checkpoint` only ran on host `0`):
 
 ```
 if jax.process_index() == 0:
   flax.training.checkpoints.save_checkpoint(...)
 ```
 
-Unfortunately this is a legacy pattern that we plan to deprecate our support for, because in multi-process environment, the checkpointing code should coordinate among hosts instead of being triggered only on the host 0. Replacing the code above with the following should resolve the hang issue:
+Unfortunately this is a legacy pattern that will be deprecated and won't be supported, because in a multi-process environment, the checkpointing code should coordinate among hosts instead of being triggered only on the host `0`. Replacing the code above with the following should resolve the hang issue:
 
 ```
 flax.training.checkpoints.save_checkpoint_multiprocess(...)
@@ -488,7 +509,9 @@ flax.training.checkpoints.save_checkpoint_multiprocess(...)
 
 ### If you don't save pytrees
 
-Orbax uses `PyTreeCheckpointHandler` to save checkpoints, which means they only save pytrees. If you want to save singular arrays or numbers, you have two options:
+Orbax uses `orbax.checkpoint.PyTreeCheckpointHandler` to save checkpoints, which means they only save pytrees.
+
+If you want to save singular arrays or numbers, you have two options:
 
 1. Use `orbax.ArrayCheckpointHandler` to save them following [this migration section](https://flax.readthedocs.io/en/latest/guides/orbax_upgrade_guide.html#saving-loading-a-single-jax-or-numpy-array).
 
