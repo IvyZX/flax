@@ -22,6 +22,7 @@ from flax.nnx.nnx import variables as variableslib
 from flax.nnx.nnx.module import GraphDef, Module
 from flax.nnx.nnx.rnglib import Rngs
 from flax.nnx.nnx.state import State
+from jax import tree_util as jtu
 
 M = tp.TypeVar('M', bound=Module)
 
@@ -55,43 +56,58 @@ def functional(cls: tp.Type[M]) -> tp.Callable[..., Functional[M]]:
   return _functional_constructor
 
 
-class LinenWrapper(Module):
+def shaped_init(module: Module, *args, **kwargs):
+  """To trigger init of all `LinenToNNX` module variables and return a wholesome state."""
+  _ = module(*args, **kwargs)
+  return nnx.split(module)
+
+
+class LinenToNNX(Module):
   def __init__(
     self,
     module: linen.Module,
-    *args: tp.Any,
     rngs: tp.Optional[Rngs] = None,
-    **kwargs: tp.Any,
   ):
     self.module = module
-
-    _rngs = (
-      {name: stream.key.raw_value for name, stream in rngs.items()}
-      if rngs
-      else {}
-    )
-    # rename default to params
-    if 'params' not in _rngs and 'default' in _rngs:
-      _rngs['params'] = _rngs['default']
-      del _rngs['default']
-
-    variables = module.init(_rngs, *args, **kwargs)
-
-    self.states = {
-      collection: variableslib.variable_type(collection)(value)
-      for collection, value in variables.items()
-    }
-
+    self.rngs = rngs
+  
   def __call__(
     self, *args: Any, rngs: tp.Optional[Rngs] = None, **kwargs: Any
   ) -> Any:
-    _rngs = (
-      {name: stream.key.value for name, stream in rngs.items()} if rngs else {}
-    )
+    
+    # Shape-based lazy init of the flax variables
+    if not rngs:
+      rngs = self.rngs
+    if not hasattr(self, 'states'):
+      _rngs = (
+        {name: stream.key.raw_value for name, stream in rngs.items()}
+        if rngs
+        else {}
+      )
+      # rename default to params
+      if 'params' not in _rngs and 'default' in _rngs:
+        _rngs['params'] = _rngs['default']
+        del _rngs['default']
+      
+      variables = self.module.init(_rngs, *args, **kwargs)
+      # self.states = {
+      #   collection: variableslib.variable_type(collection)(value)
+      #   for collection, value in variables.items()
+      # }
+      def nn_var_to_nnx_state(kp, v):
+        assert isinstance(kp[0], jtu.DictKey)
+        vtype = variableslib.variable_type(kp[0].key)
+        return vtype(v)
+      self.states = jtu.tree_map_with_path(nn_var_to_nnx_state, variables)
+    else:
+      # variables = {
+      #   collection: value.value for collection, value in self.states.items()
+      # }
+      variables = jtu.tree_map(lambda v: v.value, self.states)
+      _rngs = (
+        {name: stream.key.value for name, stream in rngs.items()} if rngs else {}
+      )
 
-    variables = {
-      collection: value.value for collection, value in self.states.items()
-    }
     out = self.module.apply(variables, *args, rngs=_rngs, **kwargs)
 
     if kwargs.get('mutable', False) != False:
@@ -107,4 +123,11 @@ class LinenWrapper(Module):
     return out
 
 
-class NNXWrapper(linen.Module): ...
+class NNXToLinen(linen.Module):
+  module: Module
+
+  def setup(self):
+    ...
+  
+  def __call__(self, *args, **kwargs):
+    ...
