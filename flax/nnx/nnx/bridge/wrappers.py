@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import dataclasses
+import functools
 import typing as tp
 from typing import Any
 
@@ -24,6 +25,7 @@ from flax.nnx.nnx.module import GraphDef, Module
 from flax.nnx.nnx.rnglib import Rngs
 from flax.nnx.nnx.state import State
 from flax.nnx.nnx.object import Object
+from flax.typing import PRNGKey
 import jax
 from jax import tree_util as jtu
 
@@ -139,11 +141,26 @@ class LinenToNNX(Module):
     return out
 
 
+def linen_to_make_nnx_rng(linen_module: linen.Module) -> Rngs:
+  return nnx.Rngs(**{name: linen_module.make_rng(name)
+                     for name in linen_module.scope.rngs.keys()})
+
+
 class NNXToLinen(linen.Module):
-  module: Module
+  module_op: tp.Callable[..., Module]
 
   def setup(self):
-    ...
+    if self.is_initializing():
+      self.module = self.module_op(rngs=linen_to_make_nnx_rng(self))
+      self.gdef, state = nnx.split(self.module)
+      # TODO: create one variable per jax array, collection based on variable type
+      self.put_variable('params', 'nnx_state', state)
+      return
+    self.nnx_state = self.variable('params', 'nnx_state').value
 
   def __call__(self, *args, **kwargs):
-    ...
+    if self.is_initializing():
+      return self.module(*args, **kwargs)
+    module = nnx.eval_shape(self.module_op, rngs=linen_to_make_nnx_rng(self))
+    nnx.update(module, self.nnx_state)
+    return module(*args, **kwargs)

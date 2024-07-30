@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from absl.testing import absltest
+import functools
 
+from absl.testing import absltest
 import flax
 from flax import linen as nn
 from flax import nnx
@@ -100,6 +101,31 @@ class TestCompatibility(absltest.TestCase):
     assert nnx.state(model).counter.count.value == 0
     y = model(x, mutable=True)
     assert nnx.state(model).counter.count.value == 1
+
+  def test_nnx_to_linen_multiple_rngs(self):
+    class NNXInner(nnx.Module):
+      def __init__(self, din, dout, rngs):
+        self.w = nnx.Param(nnx.initializers.lecun_normal()(rngs.params(), (din, dout)))
+        self.dropout = nnx.Dropout(rate=0.9, rngs=rngs)
+      def __call__(self, x, rngs):
+        return self.dropout(x @ self.w.value, rngs=rngs)
+    
+    class LinenOuter(nn.Module):
+      @nn.compact
+      def __call__(self, x):
+        nnx_rngs = bridge.wrappers.linen_to_make_nnx_rng(self)
+        inner = bridge.NNXToLinen(functools.partial(NNXInner, 4, 3, rngs=nnx_rngs))
+        return inner(x, rngs=nnx_rngs)
+    
+    xkey, pkey, dkey1, dkey2 = jax.random.split(jax.random.key(0), 4)
+    x = jax.random.normal(xkey, (2, 4))
+    model = LinenOuter()
+    y1, var = model.init_with_output({'params': pkey, 'dropout': dkey1}, x)
+    y2 = model.apply(var, x, rngs={'params': pkey, 'dropout': dkey2})
+    assert not jnp.allclose(y1, y2)  # dropout keys are different
+    # This apply needs all the init-time keys to work, which diverges from Linen behavior!
+    with self.assertRaises(AttributeError):
+      y = model.apply(var, x, rngs={'dropout': dkey2})
 
 
 if __name__ == '__main__':

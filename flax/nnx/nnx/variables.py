@@ -1005,6 +1005,15 @@ def variable_type(name: str) -> tp.Type[Variable[tp.Any]]:
   return VariableTypeCache[name]
 
 
+def variable_type_name(typ: tp.Type[Variable[tp.Any]]) -> str:
+  """The inverse of `variable_type()`."""
+  for name, t in VariableTypeCache.items():
+    if typ == t:
+      return name
+  VariableTypeCache[typ.__name__] = typ
+  return typ.__name__
+
+
 # add known variable type names
 VariableTypeCache['params'] = Param
 VariableTypeCache['batch_stats'] = BatchStat
