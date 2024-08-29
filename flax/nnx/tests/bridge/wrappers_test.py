@@ -135,16 +135,22 @@ class TestCompatibility(absltest.TestCase):
   def test_linen_to_nnx_metadata(self):
     linen_module = nn.Dense(
       features=64,
-      kernel_init=nn.with_partitioning(nn.initializers.lecun_normal(), ('in', 'out')))
+      kernel_init=nn.with_partitioning(nn.initializers.lecun_normal(), ('in', 'out')),
+      bias_init=nn.with_logical_partitioning(nn.initializers.zeros_init(), ('out-alias',),
+                                             rules=(('out-alias', 'out'))),
+      )
     x = jax.numpy.ones((1, 32))
     linen_vars = linen_module.init(jax.random.key(0), x)
     nnx_model = bridge.ToNNX(linen_module, rngs=nnx.Rngs(0)).lazy_init(x)
     # nn.Partitioned metadata box is translated into a valid nnx.Variable / VariableState box.
     self.assertIsInstance(linen_vars['params']['kernel'], nn.Partitioned)
+    self.assertIsInstance(linen_vars['params']['bias'], nn.LogicallyPartitioned)
     self.assertIsInstance(nnx_model.params['kernel'], nnx.Variable)
     np.testing.assert_array_equal(linen_vars['params']['kernel'].value,
                                   nnx_model.params['kernel'].value)
     assert nnx_model.params['kernel'].sharding == ('in', 'out')
+    assert nnx_model.params['bias'].sharding == ('out-alias',)
+    assert nnx_model.params['bias'].rules == (('out-alias', 'out'))
     _, nnx_state = nnx.split(nnx_model)
     self.assertIsInstance(nnx_state['params']['kernel'], nnx.VariableState)
     np.testing.assert_array_equal(linen_vars['params']['kernel'].value,
@@ -306,7 +312,9 @@ class TestCompatibility(absltest.TestCase):
       @nn.compact
       def __call__(self, x):
         dot = bridge.to_linen(NNXInner, x.shape[-1], self.dout, self.dropout_rate, name='dot')
-        b = self.param('b', nn.initializers.lecun_normal(), (1, self.dout))
+        logical_init = nn.with_logical_partitioning(
+          nn.initializers.lecun_normal(), ('out-alias',), rules=(('out-alias', 'out')))
+        b = self.param('b', logical_init, (1, self.dout))
         return dot(x) + b
 
     class NNXOuter(nnx.Module):
@@ -335,6 +343,7 @@ class TestCompatibility(absltest.TestCase):
     self.assertIsInstance(w, nnx.Param)
     np.testing.assert_allclose(model(x), x @ w + b)
     assert hasattr(w, 'sharding') and w.sharding == ('in', 'out')
+    assert hasattr(b, 'sharding') and b.sharding == ('out-alias', )
 
   def test_linen_nnx_linen(self):
     # TODO: add when we can safely `lazy_init` the NNX module inside `ToLinen` without
