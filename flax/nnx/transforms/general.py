@@ -141,7 +141,7 @@ def split_inputs(
   .. note::
     If the transform has a rigid output structure like ``jax.grad`` or ``jax.lax.scan``
     then ``split_inputs`` and ``merge_inputs`` will not work. In this case, use the
-    `Functional API <https://flax.readthedocs.io/en/latest/nnx/nnx_basics.html#the-functional-api>`__.
+    `Functional API <https://flax-nnx.readthedocs.io/en/latest/nnx/nnx_basics.html#the-functional-api>`__.
   """
   if isinstance(f, Missing):
     return functools.partial(split_inputs, ctxtag=ctxtag)  # type: ignore[return-value]

@@ -1360,7 +1360,7 @@ def split(
 
   :func:`split` and :func:`merge` are primarily used to interact directly with JAX
   transformations, see
-  `Functional API <https://flax.readthedocs.io/en/latest/nnx/nnx_basics.html#the-functional-api>`__
+  `Functional API <https://flax-nnx.readthedocs.io/en/latest/nnx/nnx_basics.html#the-functional-api>`__
   for more information.
 
   Arguments:
@@ -1406,7 +1406,7 @@ def merge(
 
   :func:`split` and :func:`merge` are primarily used to interact directly with JAX
   transformations, see
-  `Functional API <https://flax.readthedocs.io/en/latest/nnx/nnx_basics.html#the-functional-api>`__
+  `Functional API <https://flax-nnx.readthedocs.io/en/latest/nnx/nnx_basics.html#the-functional-api>`__
   for more information.
 
   Args:

@@ -60,7 +60,7 @@ Features
          .. div:: sd-font-normal
 
             Flax NNX allows fine-grained control of the model's state via
-            its `Filter <https://flax.readthedocs.io/en/latest/nnx/filters_guide.html>`__
+            its `Filter <https://flax-nnx.readthedocs.io/en/latest/nnx/filters_guide.html>`__
             system.
 
    .. grid-item::

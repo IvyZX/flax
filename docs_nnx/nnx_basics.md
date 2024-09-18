@@ -219,9 +219,9 @@ Theres a couple of things happening in this example that are worth mentioning:
 
 #### Scan over layers
 Next lets take a look at a different example, which uses
-[nnx.vmap](https://flax.readthedocs.io/en/latest/api_reference/flax.nnx/transforms.html#flax.nnx.vmap)
+[nnx.vmap](https://flax-nnx.readthedocs.io/en/latest/api_reference/flax.nnx/transforms.html#flax.nnx.vmap)
 to create a stack of multiple MLP layers and
-[nnx.scan](https://flax.readthedocs.io/en/latest/api_reference/flax.nnx/transforms.html#flax.nnx.scan)
+[nnx.scan](https://flax-nnx.readthedocs.io/en/latest/api_reference/flax.nnx/transforms.html#flax.nnx.scan)
 to iteratively apply each layer of the stack to the input.
 
 Notice the following:

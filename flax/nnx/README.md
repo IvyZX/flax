@@ -2,7 +2,7 @@
 
 # NNX
 
-_**N**eural **N**etworks for JA**X**_ - | [docs](https://flax.readthedocs.io/en/latest/nnx/index.html) |
+_**N**eural **N**etworks for JA**X**_ - | [docs](https://flax-nnx.readthedocs.io/en/latest/nnx/index.html) |
 
 NNX is a JAX-based neural network library that focuses on providing the best development experience to make
 building and experimenting with neural networks as easy and intuitive as possible.
@@ -53,7 +53,7 @@ def train_step(model, optimizer, x, y):
   return loss
 ```
 
-To learn more about the `Module` abstraction, check out our [NNX Basics](https://flax.readthedocs.io/en/latest/nnx/nnx_basics.html#) guide.
+To learn more about the `Module` abstraction, check out our [NNX Basics](https://flax-nnx.readthedocs.io/en/latest/nnx_basics.html#) guide.
 
 ## Installation
 

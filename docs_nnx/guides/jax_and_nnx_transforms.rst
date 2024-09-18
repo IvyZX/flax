@@ -27,7 +27,7 @@ even those whose state will be mutated, whereas they aren't recognized in JAX tr
 Therefore Flax NNX transformations can transform functions that are not pure and make mutations and
 side-effects.
 
-Flax NNX's `Functional API <https://flax.readthedocs.io/en/latest/nnx/nnx_basics.html#the-functional-api>`_
+Flax NNX's `Functional API <https://flax-nnx.readthedocs.io/en/latest/nnx/nnx_basics.html#the-functional-api>`_
 provides a way to convert graph structures to pytrees and back. By doing this at every function
 boundary you can effectively use graph structures with any JAX transform and propagate state updates
 in a way consistent with functional purity. Flax NNX custom transforms such as ``nnx.jit`` and ``nnx.grad``

@@ -160,7 +160,7 @@ def eval_step(model: CNN, metrics: nnx.MultiMetric, batch):
   metrics.update(loss=loss, logits=logits, labels=batch['label'])  # inplace updates
 ```
 
-The [`nnx.jit`](https://flax.readthedocs.io/en/latest/api_reference/flax.nnx/transforms.html#flax.nnx.jit) decorator traces the `train_step` function for just-in-time compilation with
+The [`nnx.jit`](https://flax-nnx.readthedocs.io/en/latest/api_reference/flax.nnx/transforms.html#flax.nnx.jit) decorator traces the `train_step` function for just-in-time compilation with
 [XLA](https://www.tensorflow.org/xla), optimizing performance on
 hardware accelerators. `nnx.jit` is similar to [`jax.jit`](https://jax.readthedocs.io/en/latest/_autosummary/jax.jit.html#jax.jit),
 except it can transforms functions that contain Flax NNX objects as inputs and outputs.
