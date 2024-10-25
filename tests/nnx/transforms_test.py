@@ -2612,6 +2612,46 @@ class TestCond(absltest.TestCase):
     )
 
 
+class TestSwitch(absltest.TestCase):
+  def test_basic(self):
+    class RoundTable(nnx.Module):
+      def __init__(self):
+        self.next_index = 0
+        self.linear = nnx.Linear(10, 10, rngs=nnx.Rngs(0))
+        self.linear.kernel.value = jnp.identity(10)
+        self.rounds_count = nnx.Variable(jnp.array(0))
+      
+      def __call__(self, x):
+        def fn0(m, x):
+          m.rounds_count += 1
+          return m.linear(x)
+        def fn1(m, x):
+          return m.linear(x) * 2
+        def fn2(m, x):
+          m.linear.kernel.value = jnp.zeros((10, 10))
+          return m.linear(x)
+        
+        # y = nnx.cond(self.next_index.value == 0, fn0, fn1, self, x)
+        y = nnx.switch(self.next_index, (fn0, fn1, fn2), self, x)
+        self.next_index = (self.next_index + 1) % 3
+        return y
+
+    model = RoundTable()
+    x = jnp.ones((10,))
+    np.testing.assert_array_equal(model(x), x)
+    assert model.rounds_count.value == 1
+    assert model.next_index == 1
+    np.testing.assert_array_equal(model(x), x * 2)
+    assert model.rounds_count.value == 1
+    assert model.next_index == 2
+    np.testing.assert_array_equal(model(x), jnp.zeros((10,)))
+    assert model.rounds_count.value == 1
+    assert model.next_index == 0
+    np.testing.assert_array_equal(model(x), jnp.zeros((10,)))
+    assert model.rounds_count.value == 2
+    assert model.next_index == 1
+        
+
 class TestSplitMergeInputs(absltest.TestCase):
   def test_split_inputs(self):
     class StatefulLinear(nnx.Linear):

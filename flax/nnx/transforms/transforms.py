@@ -160,3 +160,16 @@ def cond(
     *operands,
     **kwargs,
   )
+
+
+@general.split_inputs(ctxtag='switch')
+def switch(
+  index,
+  branches: tp.Sequence[tp.Callable[..., A]],
+  *operands,
+) -> A:
+  return jax.lax.switch(
+    index,
+    [general.merge_inputs(f, ctxtag='switch') for f in branches],
+    *operands,
+  )
