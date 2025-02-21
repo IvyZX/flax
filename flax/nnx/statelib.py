@@ -425,7 +425,7 @@ class State(MutableMapping[K, V], reprlib.Representable):
   def __or__(self, other: State[K, V]) -> State[K, V]:
     if not other:
       return self
-    return State.merge(self, other)
+    return merge_state(self, other)
 
   def __sub__(self, other: State[K, V]) -> State[K, V]:
     warnings.warn(
@@ -744,7 +744,7 @@ def _split_state(
 
 
 def create_path_filters(state: State):
-  flat_state = state.flat_state()
+  flat_state = to_flat_state(state)
   value_paths: dict[tp.Any, set[PathParts]] = {}
   for path, value in flat_state:
     if isinstance(value, (variablelib.Variable, variablelib.VariableState)):

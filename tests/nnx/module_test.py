@@ -249,7 +249,7 @@ class TestModule(absltest.TestCase):
     )
 
     graphdef, p = nnx.split(m)
-    assert len(p.flat_state()) == 2
+    assert len(nnx.to_flat_state(p)) == 2
     assert len(jax.tree_util.tree_leaves(p)) == 2
 
   def test_clone(self):
@@ -261,13 +261,13 @@ class TestModule(absltest.TestCase):
     m2 = nnx.clone(m)
 
     assert m is not m2
-    assert m2.a[0].value == m2.b.c.value
-    assert m2.a[1].value == m2.b.d.value
+    assert m2.a[0] == m2.b.c
+    assert m2.a[1] == m2.b.d
 
-    assert m.a[0].value == m2.a[0].value
-    assert m.a[1].value == m2.a[1].value
-    assert m.b.c.value == m2.b.c.value
-    assert m.b.d.value == m2.b.d.value
+    assert m.a[0] == m2.a[0]
+    assert m.a[1] == m2.a[1]
+    assert m.b.c == m2.b.c
+    assert m.b.d == m2.b.d
 
   def test_sow_basic(self):
     class Foo(nnx.Module):
@@ -286,7 +286,7 @@ class TestModule(absltest.TestCase):
 
     intermediates = nnx.pop(m, nnx.Intermediate)
 
-    assert issubclass(intermediates.y.type, nnx.Intermediate)
+    assert issubclass(intermediates['y'].type, nnx.Intermediate)
     assert intermediates['y'].value == (3, 11)
 
     assert not hasattr(m, 'y')
@@ -607,7 +607,7 @@ class TestModule(absltest.TestCase):
 
     obj = Foo(nnx.Rngs(0))
 
-    leaves = nnx.state(obj).flat_state().leaves
+    leaves = nnx.to_flat_state(nnx.state(obj)).leaves
 
     expected_total = sum(int(np.prod(x.value.shape)) for x in leaves)
     expected_total_params = sum(
@@ -688,14 +688,14 @@ class TestModuleDataclass:
     graphdef, state = nnx.split(m)
 
     assert len(state) == 4
-    assert state.b.value == 2
-    assert state.b.type == nnx.Variable
-    assert state.c.value == 3
-    assert state.c.type == nnx.Param
-    assert state.d.value == 4
-    assert state.d.type == nnx.Variable
-    assert state.e.value == 5
-    assert state.e.type == nnx.BatchStat
+    assert state['b'].value == 2
+    assert state['b'].type == nnx.Variable
+    assert state['c'].value == 3
+    assert state['c'].type == nnx.Param
+    assert state['d'].value == 4
+    assert state['d'].type == nnx.Variable
+    assert state['e'].value == 5
+    assert state['e'].type == nnx.BatchStat
 
   def test_post_init(self):
 
@@ -733,7 +733,7 @@ class TestModuleDef:
     graphdef, states = nnx.split(foo)
 
     assert isinstance(states, nnx.State)
-    assert issubclass(states.w.type, nnx.Param)
+    assert issubclass(states['w'].type, nnx.Param)
 
     y, _updates = graphdef.apply(states)(x=2.0, rngs=nnx.Rngs(e=1))
 
@@ -757,8 +757,8 @@ class TestModuleDef:
 
     assert isinstance(graphdef, nnx.graph.NodeDef | nnx.graph.NodeRef)
     assert isinstance(state, nnx.State)
-    assert issubclass(state.w.type, nnx.Param)
-    assert issubclass(state.c.type, nnx.Variable)
+    assert issubclass(state['w'].type, nnx.Param)
+    assert issubclass(state['c'].type, nnx.Variable)
 
     y, (graphdef, state) = graphdef.apply(state)(x=2.0, rngs=nnx.Rngs(e=1))
 
@@ -820,7 +820,7 @@ class TestModuleDef:
     graphdef, state = nnx.split(foo)
 
     assert isinstance(state, nnx.State)
-    assert isinstance(state.a, nnx.State)
+    assert isinstance(state['a'], nnx.State)
 
     foo2 = nnx.merge(graphdef, state)
 
