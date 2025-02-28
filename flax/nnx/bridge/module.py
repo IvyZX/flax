@@ -32,6 +32,7 @@ import flax.nnx.module as nnx_module
 from flax.nnx.object import Object
 from flax.nnx import variablelib
 from flax.nnx.bridge import variables as bridge_variables
+from flax.nnx.transforms import transforms
 import jax.numpy as jnp
 
 A = tp.TypeVar('A')
@@ -115,6 +116,14 @@ class ModuleMeta(nnx_module.ModuleMeta):
   def _object_meta_construct(cls, self, *args, **kwargs):
     vars(self)['scope'] = None
     super()._object_meta_construct(self, *args, **kwargs)
+
+
+def current_module() -> tp.Optional[Module]:
+  """A quick util to get the current bridge module."""
+  ctx = MODULE_CONTEXT.module_stack[-1]
+  if ctx is None:
+    return None
+  return ctx.module
 
 
 def _module_meta_call(cls: type[M], *args, **kwargs) -> M:
@@ -502,3 +511,21 @@ def _get_unbound_fn(method_or_fn: tp.Callable) -> tp.Callable:
     raise errors.ApplyModuleInvalidMethodError(method_or_fn)
 
   return method_or_fn
+
+
+def wrap_nnx_module(factory: tp.Callable[[rnglib.Rngs], nnx_module.Module]):
+  """Create module at init time, or make abstract module and let parent bind it with its state. Use current bridge module scope for RNG generation."""
+  parent = current_module()
+  assert parent is not None, 'wrap_nnx_module only needed inside bridge Module'
+  assert parent.scope is not None
+  if parent.is_initializing():
+    return factory(parent.scope.rngs)
+  rngs = parent.scope.rngs if parent.scope.rngs else rnglib.Rngs(7)  # dummy
+  abs_module = transforms.eval_shape(lambda: factory(rngs))
+  # Make sure the internal rng state is not abstract - everything else shall be
+  for _, stream in graph.iter_graph(abs_module):
+    if isinstance(stream, rnglib.RngStream):
+      parent_stream = rngs[stream.key.tag]
+      stream.key.value = parent_stream.key.value
+      stream.count.value = parent_stream.count.value
+  return abs_module

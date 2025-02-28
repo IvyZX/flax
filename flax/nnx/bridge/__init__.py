@@ -24,3 +24,5 @@ from .variables import with_partitioning as with_partitioning
 from .module import Module as Module
 from .module import Scope as Scope
 from .module import compact as compact
+from .module import current_module as current_module
+from .module import wrap_nnx_module as wrap_nnx_module

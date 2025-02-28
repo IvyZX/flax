@@ -302,6 +302,48 @@ class TestBridgeModule(absltest.TestCase):
     y: jax.Array = foo.apply(variables, x)
     self.assertEqual(y.shape, (3, 5))
 
+  def test_with_pure_nnx(self):
+    class NNXLayer(nnx.Module):
+      def __init__(self, dim, dropout, rngs):
+        self.linear = nnx.Linear(dim, dim, use_bias=False, rngs=rngs)
+        self.dropout = nnx.Dropout(dropout, rngs=rngs)
+        self.count = nnx.Intermediate(jnp.array([0.]))
+      def __call__(self, x):
+        # Required check to avoid state update in `init()`. Can this be avoided?
+        if not bridge.current_module().is_initializing():
+          self.count.value = self.count.value + 1
+        x = self.linear(x)
+        x = self.dropout(x)
+        return x
+
+    class BridgeMLP(bridge.Module):
+      num_layers: int
+      @bridge.compact
+      def __call__(self, x):
+        for i in range(self.num_layers):
+          layer = nnx.bridge.wrap_nnx_module(lambda r: NNXLayer(8, 0.3, rngs=r))
+          setattr(self, f'layer{i}', layer)
+          x = layer(x)
+        return x
+
+    model = BridgeMLP(2)
+    x = jax.random.normal(jax.random.key(0), (4, 8))
+    variables = model.init(jax.random.key(1), x)
+    self.assertSameElements(variables['params'].keys(), ['layer0', 'layer1'])
+    self.assertFalse(jnp.array_equal(
+      variables['params']['layer0']['linear']['kernel'],
+      variables['params']['layer1']['linear']['kernel'], ))
+    self.assertEqual(variables['intermediates']['layer1']['count'], 0)
+
+    k1, k2, k3 = jax.random.split(jax.random.key(0), 3)
+    y1 = model.apply(variables, x, rngs={'params': k1, 'dropout': k2})
+    y2 = model.apply(variables, x, rngs={'params': k1, 'dropout': k3})
+    assert not jnp.array_equal(y1, y2)
+
+    _, updates = model.apply(variables, x, rngs={'params': k1, 'dropout': k3},
+                             mutable=True)
+    self.assertEqual(updates['intermediates']['layer1']['count'], 1)
+
 
 if __name__ == '__main__':
   absltest.main()
